@@ -9,6 +9,14 @@
 using PyPlot
 using Distributions
 
+
+Δt = 0.01               # simulation step length in ms nb consistent with τ
+cellDiam = 50.
+pulseAmplitude = .5   # nA
+
+# Weiner increments (W is Brownian motion)
+dW = Normal(0.0,sqrt(Δt))
+
 """
   Stochastic Neuron data type
 """
@@ -120,32 +128,26 @@ function stochastic_update(neuron, Inject, Δt)
     # also improves readability by naming the state variables
     v = neuron.x[1]
     p = neuron.x[2]
+    n_open = neuron.x[3]
 
     Inject = Inject*1.0e-3   # convert input current nA -> μA
 
-    # coefficients of ODE for channel open probability, τ dp/dt = p_inf - p
+    # coefficients of stochastic ODE for channel open probability,
+    # τ dp/dt = p_inf - p + sqrt(γ)dW
     # time constant and equilibrium open probability
-    τ = 1.0/(α(v) + β(v))
-    p_infinity = α(v)*τ
+    a = α(v)
+    b = β(v)
+    τ = 1.0/(a+b)
+    p_infinity = a*τ
+    γ = (a*(1-p) + b*p)/neuron.N
 
-    # Compute number of open channels using Normal approximation to binomial
-    mean_nch = neuron.N*p    # mean number of channels
-    sd_nch = sqrt(p*(1-p))  #  sd of channel number
-    chNoiseDist = Normal(0.0, sd_nch)      # channel noise number distribution
-    channel_noise = rand(chNoiseDist,1)[]    # sample from noise number distn
+    Ichannel = neuron.g*n_open*(v - neuron.E)
 
-    # mean number of open channels
-    Ichannel_mean = neuron.g*mean_nch*(v - neuron.E)
+    # Euler integration for membrane potential
+    v = v - Δt*(Ichannel - Inject)/neuron.C
 
-    # channel current noise
-    Ichannel_noise = neuron.g*channel_noise*(v-neuron.E)
-
-    # I specified in nA, convert to mA for dimensional correctness
-    # Euler-Maruyama formula
-    v = v - Δt*Ichannel_mean/neuron.C +
-            Δt*Inject/neuron.C - sqrt(Δt)*Ichannel_noise/neuron.C
-
-    p = p + Δt*(p_infinity - p)/τ
+    # Euler-Maruyama integration for open prob
+    p = p + Δt*(p_infinity - p)/τ + sqrt(γ)*rand(dW,1)[]
 
     # numerical solution of ODE for p can overshoot range [0 1]
     # any tiny overshoot (p<0 or p>1) will crash rand()
@@ -154,8 +156,8 @@ function stochastic_update(neuron, Inject, Δt)
 
     neuron.x[1] = v
     neuron.x[2] = p
-    neuron.x[3] = mean_nch + channel_noise
-    neuron.x[4] = (Ichannel_mean + Ichannel_noise)*1.0e3   # convert μA -> nA
+    neuron.x[3] = neuron.N*p
+    neuron.x[4] = Ichannel*1.0e3   # convert μA -> nA
 
 end
 
@@ -170,17 +172,16 @@ u = zeros(length(t))
   return u
 end
 
-Δt = .01                # simulation step length in ms nb consistent with τ
+
 const T = 30.               # duration of simulation
 const t = collect(0.0:Δt:T)  # simulation time array
 
 pulseStart = 10.
 pulseLen = 10.
-pulseAmplitude = 10.0   # nA
 I = pulse(t, pulseStart, pulseLen, pulseAmplitude)
 
 # for cell diameter 1cm: d = sqrt(1.0/pi)*1e4)
-sneuron = Stochastic_neuron(36.,50.0)   # construct a neuron
+sneuron = Stochastic_neuron(36.,cellDiam)   # construct a neuron
 println("Stochastic neuron with ", sneuron.N, " channels.")
 
 # burn in

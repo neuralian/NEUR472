@@ -9,6 +9,9 @@
 using PyPlot
 using Distributions
 
+cellDiam = 50.
+Δt = .001                # simulation step length in ms nb consistent with τ
+pulseAmplitude = .5   # nA
 
 """
   Markov Neuron data type
@@ -131,8 +134,7 @@ function markov_update(neuron, Inject, Δt)
     Inject = Inject*1.0e-3  # nA -> μA
 
     # number of channels that open
-    # opening probability is α(v)Δt
-    # Binomial N must be integer
+    # opening probability is α(v)Δt for each channel
     n_opening_distribution = Binomial(Int64(neuron.N-n_open), α(v)*Δt)
     n_opening = rand(n_opening_distribution,1)[]
 
@@ -176,17 +178,16 @@ u = zeros(length(t))
   return u
 end
 
-Δt = .01                # simulation step length in ms nb consistent with τ
+
 const T = 30.               # duration of simulation
 const t = collect(0.0:Δt:T)  # simulation time array
 
 pulseStart = 10.
 pulseLen = 10.
-pulseAmplitude = 10.   # nA
 I = pulse(t, pulseStart, pulseLen, pulseAmplitude)
 
 # for cell diameter 1cm: d = sqrt(1.0/pi)*1e4)
-mneuron = Markov_neuron(36.,50.)   # construct a neuron
+mneuron = Markov_neuron(36.,cellDiam)   # construct a neuron
 
 # burn in
 for i in 1:10000

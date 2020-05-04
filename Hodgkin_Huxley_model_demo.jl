@@ -7,7 +7,7 @@
 # gr()
 using PyPlot
 
-cellDiam = 50.0
+cellDiam = 500.0
 
 """
   Neuron data type
