@@ -7,6 +7,8 @@
 # gr()
 using PyPlot
 
+cellDiam = 50.0
+
 """
   Neuron data type
 """
@@ -80,6 +82,20 @@ function hh_update(neuron, Inject, Δt)
 end
 
 """
+  Utility function for calculating number of channels with a given conductance
+    in pS required to get specified conductance in mS/cm^2 for a spherical
+    cell of diameter d in microns.
+"""
+function nchannels(s_channel, s_membrane, celldiam)
+
+   A = π*celldiam^2*1.0e-8            # membrane area in cm^2
+   mS = A*s_membrane                  # capacitance in mS
+   pS = 1.0e6*mS                      # capacitance in pS
+   n = Int64(round(pS/s_channel))     # number of channels
+
+end
+
+"""
    pulse waveform same length as t
 """
 function pulse(t, start, len, amplitude)
@@ -99,7 +115,7 @@ pulseLen = 10.
 pulseAmplitude = 10. # nA
 I = pulse(t, pulseStart, pulseLen, pulseAmplitude)
 
-hneuron = HH_neuron(50.)   # construct a neuron
+hneuron = HH_neuron(cellDiam)   # construct a neuron
 
 # burn in
 for i in 1:10000
@@ -121,27 +137,35 @@ end
 #     layout = (3,1),  label = :none,
 #     title = ["membrane potential" "channel open probability" "input current"])
 
-fig, (ax1, ax2, ax3, ax4) = subplots(nrows=4, ncols = 1, figsize = (10,8))
+fig, (ax1, ax2, ax3, ax4,ax5) = subplots(nrows=5, ncols = 1, figsize = (10,8))
 ax1.plot(t, hx[:,1])
 ax1.set_title("Hodgkin-Huxley Model, "*string(hneuron.d)*"μm diameter cell")
 ax1.set_ylabel("mV re RMP")
 ax1.set_xlim(0,T)
+ax1.set_xlabel("Membrane Potential")
 
 ax2.plot(t, hx[:,2])
-ax2.set_title("Channel Open Probability")
+ax2.set_xlabel("Channel Open Probability")
 ax2.set_ylabel("Pr")
 ax2.set_xlim(0,T)
 ax2.set_ylim(0.0, 0.5)
 
-ax3.plot(t, hx[:,3])
-ax3.set_xlabel("Channel Current")
-ax3.set_ylabel("nA")
+n = nchannels(10., 36., cellDiam)
+ax3.plot(t, n.*hx[:,2])
+ax3.set_xlabel("Number of Open Channels")
+ax3.set_ylabel("Pr")
 ax3.set_xlim(0,T)
+ax3.set_ylim(0.0, n/2)
 
-ax4.plot(t, I)
-ax4.set_xlabel("Injected Current       (time in ms)")
+ax4.plot(t, hx[:,3])
+ax4.set_xlabel("Channel Current")
 ax4.set_ylabel("nA")
 ax4.set_xlim(0,T)
+
+ax5.plot(t, I)
+ax5.set_xlabel("Injected Current       (time in ms)")
+ax5.set_ylabel("nA")
+ax5.set_xlim(0,T)
 
 tight_layout()
 

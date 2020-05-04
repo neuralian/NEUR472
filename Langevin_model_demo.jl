@@ -15,7 +15,7 @@ using Distributions
 struct Stochastic_neuron
 
     # state vector
-    x::Array{Float64,1} # [v,p, i] = [potential, p_open, i_channel]
+    x::Array{Float64,1} # [v,p,n, i] = [potential, p_open, n_open, i_channel]
 
     # parameters
     g::Float64    # channel conductance pS
@@ -68,7 +68,21 @@ function Stochastic_neuron(membrane_conductance::Float64, d::Float64)
                           # (equation dimensions: mv / ms = mS * mv / uF )
 
     # overload default constructor
-    return Stochastic_neuron([E, p_init, i_init], g_mS, E, C, N, d, A)
+    return Stochastic_neuron([E, p_init, p_init*N, i_init], g_mS, E, C, N, d, A)
+
+end
+
+"""
+  Utility function for calculating number of channels with a given conductance
+    in pS required to get specified conductance in mS/cm^2 for a spherical
+    cell of diameter d in microns.
+"""
+function nchannels(s_channel, s_membrane, celldiam)
+
+   A = π*celldiam^2*1.0e-8            # membrane area in cm^2
+   mS = A*s_membrane                  # capacitance in mS
+   pS = 1.0e6*mS                      # capacitance in pS
+   n = Int64(round(pS/s_channel))     # number of channels
 
 end
 
@@ -114,19 +128,22 @@ function stochastic_update(neuron, Inject, Δt)
     τ = 1.0/(α(v) + β(v))
     p_infinity = α(v)*τ
 
-    # generate noise using Normal approximation to binomial
-    mean_noise = neuron.N*p
-    sd_noise = sqrt(p*(1-p))  # nb Julia Normal(μ, σ)
-    noisedist = Normal(0.0, sd_noise)
-    noise = rand(noisedist,1)[]
+    # Compute number of open channels using Normal approximation to binomial
+    mean_nch = neuron.N*p    # mean number of channels
+    sd_nch = sqrt(p*(1-p))  #  sd of channel number
+    chNoiseDist = Normal(0.0, sd_nch)      # channel noise number distribution
+    channel_noise = rand(chNoiseDist,1)[]    # sample from noise number distn
 
-    # channel current
-    Ichannel = neuron.g*mean_noise*(v - neuron.E)
+    # mean number of open channels
+    Ichannel_mean = neuron.g*mean_nch*(v - neuron.E)
+
+    # channel current noise
+    Ichannel_noise = neuron.g*channel_noise*(v-neuron.E)
 
     # I specified in nA, convert to mA for dimensional correctness
     # Euler-Maruyama formula
-    v = v - Δt*Ichannel/neuron.C +
-            Δt*Inject/neuron.C - sqrt(Δt)*neuron.g*noise*(v - neuron.E)/neuron.C
+    v = v - Δt*Ichannel_mean/neuron.C +
+            Δt*Inject/neuron.C - sqrt(Δt)*Ichannel_noise/neuron.C
 
     p = p + Δt*(p_infinity - p)/τ
 
@@ -137,7 +154,8 @@ function stochastic_update(neuron, Inject, Δt)
 
     neuron.x[1] = v
     neuron.x[2] = p
-    neuron.x[3] = Ichannel*1.0e3   # convert μA -> nA
+    neuron.x[3] = mean_nch + channel_noise
+    neuron.x[4] = (Ichannel_mean + Ichannel_noise)*1.0e3   # convert μA -> nA
 
 end
 
@@ -184,7 +202,7 @@ end
 
 # Plots
 # nb useful to force y-axis limits for comparisons
-fig, (ax1, ax2, ax3, ax4) = subplots(nrows=4, ncols = 1, figsize=(10,8))
+fig, (ax1, ax2, ax3, ax4, ax5) = subplots(nrows=5, ncols = 1, figsize=(10,8))
 ax1.plot(t, sx[:,1])
 ax1.set_title("Langevin Model, "*string(sneuron.d)*
        "μm diameter cell with "*string(sneuron.N)*"  channels.")
@@ -199,13 +217,19 @@ ax2.set_ylim(0.0, 0.5)
 ax2.set_xlim(0, T)
 
 ax3.plot(t, sx[:,3])
-ax3.set_xlabel("Channel Current")
-ax3.set_ylabel("nA")
+ax3.set_xlabel("Number of Open Channels")
+ax3.set_ylabel("N")
+ax3.set_ylim(0.0, sneuron.N/2)
 ax3.set_xlim(0, T)
 
-ax4.plot(t, I)
-ax4.set_xlabel("Injected Current       (time in ms)")
+ax4.plot(t, sx[:,4])
+ax4.set_xlabel("Channel Current")
 ax4.set_ylabel("nA")
+ax4.set_xlim(0, T)
+
+ax5.plot(t, I)
+ax5.set_xlabel("Injected Current       (time in ms)")
+ax5.set_ylabel("nA")
 tight_layout()
 
 display(fig)
