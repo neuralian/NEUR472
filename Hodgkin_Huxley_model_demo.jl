@@ -7,7 +7,59 @@
 # gr()
 using PyPlot
 
-cellDiam = 500.0
+cellDiam = 50.0
+Δt = .0001              # simulation step length in ms nb consistent with τ
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 """
   Neuron data type
@@ -106,7 +158,7 @@ u = zeros(length(t))
   return u
 end
 
-Δt = .01                # simulation step length in ms nb consistent with τ
+
 const T = 30.               # duration of simulation
 const t = collect(0.0:Δt:T)  # simulation time array
 
