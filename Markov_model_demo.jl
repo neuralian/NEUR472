@@ -9,8 +9,8 @@
 using PyPlot
 using Distributions
 
-cellDiam = 50.
-Δt = .001                # simulation step length in ms nb consistent with τ
+cellDiam = 5.
+Δt = .01                # simulation step length in ms nb consistent with τ
 pulseAmplitude = .5   # nA
 
 """
@@ -71,7 +71,7 @@ function Markov_neuron(membrane_conductance::Float64, d::Float64)
     C = A*Cs              # capacitance in uF
     N = nchannels(g_pS,membrane_conductance,d)  # total channels
     n_init = round(N*p_init) # initial n open
-    g_mS = g_pS*1.0e-6    # channel conductance in mS
+    g_mS = g_pS*1.0e-9    # channel conductance in mS
                           # (equation dimensions: mv / ms = mS * mv / uF )
 
     # overload default constructor
@@ -88,7 +88,7 @@ function nchannels(s_channel, s_membrane, celldiam)
 
    A = π*celldiam^2*1.0e-8            # membrane area in cm^2
    mS = A*s_membrane                  # capacitance in mS
-   pS = 1.0e6*mS                      # capacitance in pS
+   pS = 1.0e9*mS                      # capacitance in pS
    n = Int64(round(pS/s_channel))     # number of channels
 
 end
@@ -124,45 +124,44 @@ function markov_update(neuron, Inject, Δt)
 
     # copy the state variables before you start messing with them!
     v = neuron.x[1]
-    p_open = neuron.x[2]
-    n_open = neuron.x[3]
-
-    # coefficients of ODE for p  (τ dp/dt = p_inf - p)
-    τ = 1.0/(α(v) + β(v))
-    p_infinity = α(v)*τ
+    p = neuron.x[2]
+    n = neuron.x[3]
 
     Inject = Inject*1.0e-3  # nA -> μA
 
-    # number of channels that open
-    # opening probability is α(v)Δt for each channel
-    n_opening_distribution = Binomial(Int64(neuron.N-n_open), α(v)*Δt)
-    n_opening = rand(n_opening_distribution,1)[]
+    # current through channels
+    Ichannel = neuron.g*n*(v - neuron.E)
 
-    # number of channels that close
-    # closing probability is β(v)Δt
-    n_closing_distribution = Binomial(Int64(n_open), β(v)*Δt)
-    n_closing = rand(n_closing_distribution,1)[]
+    # updated membrane potential
+    v = v - Δt*(Ichannel -Inject)/neuron.C
+
+    # coefficients of ODE for channel state prob  (τ dp/dt = p_inf - p)
+    τ = 1.0/(α(v) + β(v))
+    p_infinity = α(v)*τ
+
+    # change in channel state probability (difference approx to ODE)
+    Δp = Δt*(p_infinity - p)/τ
+
+    # updated channel state probability
+    p = p + Δp
+
+    # constrain probability to (0,1)
+    if (p>1.0) p = 1.0 end
+    if (p<0.0) p = 0.0 end
+
+    # distribution of number of channels that open (can be <0)
+    n_opening_dist = Binomial(Int64(neuron.N-n), abs(Δp))   
+
+    # number of channels that open [close]
+    n_opening = rand(n_opening_dist,1)[]
 
     # update number of open channels
-    n_open = n_open + n_opening - n_closing
-
-    # current through channels
-    Ichannel = neuron.g*n_open*(v - neuron.E)
-
-    # external current I in nA, convert to mA for dimensional correctness
-    v = v - Δt*(Ichannel -Inject)/neuron.C
-    p_open = p_open + Δt*(p_infinity - p_open)/τ
-
-    # # numerical solution of ODE for p can overshoot range [0 1]
-    # # any tiny overshoot (p<0 or p>1) will crash rand()
-    # if (p>1.0) p = 1.0 end
-    # if (p<0.0) p = 0.0 end
-    # neuron.x[2] = p
+    n = n + sign(Δp)*n_opening
 
     # update the state vector
     neuron.x[1] = v
-    neuron.x[2] = p_open
-    neuron.x[3] = n_open
+    neuron.x[2] = p
+    neuron.x[3] = n #rand(n_dist, 1)[]
     neuron.x[4] = Ichannel*1.0e3  # μA -> nA
 
 end

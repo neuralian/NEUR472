@@ -19,11 +19,11 @@ conductance = 36.  # mS/cm^2 (From Hodgkin & Huxley 1952)
 # cellDiam = 100. # μm
 # pulseAmplitude = 100. # nA
 
-cellDiam = 50. # μm
-pulseAmplitude = 10. # nA
+# cellDiam = 50. # μm
+# pulseAmplitude = 10. # nA
 
-# cellDiam = 10. # μm
-# pulseAmplitude = 0.5 # nA
+cellDiam = 1.0 # μm
+pulseAmplitude = 0.005 # nA
 
 # Weiner increments (W is Brownian motion)
 dW = Normal(0.0,sqrt(Δt))
@@ -96,16 +96,16 @@ ax2.plot(t, hx[:,2])
 ax2.set_xlabel("Channel Open Probability")
 ax2.set_ylabel("Pr")
 ax2.set_xlim(0,T)
-ax2.set_ylim(0.0, 0.5)
+ax2.set_ylim(0.0, 1.0)
 
 n = nchannels(10., 36., cellDiam)
 ax3.plot(t, sx[:,3])
 ax3.plot(t, mx[:,3])
 ax3.plot(t, mneuron.N*hx[:,2])
 ax3.set_xlabel("Number of Open Channels")
-ax3.set_ylabel("Pr")
+ax3.set_ylabel("n")
 ax3.set_xlim(0,T)
-ax3.set_ylim(0.0, n/2)
+ax3.set_ylim(0.0, mneuron.N)
 
 ax4.plot(t, sx[:,4])
 ax4.plot(t, mx[:,4])

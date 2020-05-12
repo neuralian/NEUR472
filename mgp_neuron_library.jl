@@ -122,7 +122,7 @@ function Markov_neuron(membrane_conductance::Float64, d::Float64)
     C = A*Cs              # capacitance in uF
     N = nchannels(g_pS,membrane_conductance,d)  # total channels
     n_init = round(N*p_init) # initial n open
-    g_mS = g_pS*1.0e-6    # channel conductance in mS
+    g_mS = g_pS*1.0e-9    # channel conductance in mS
                           # (equation dimensions: mv / ms = mS * mv / uF )
 
     # overload default constructor
@@ -218,7 +218,7 @@ function Stochastic_neuron(membrane_conductance::Float64, d::Float64)
     A = π*d^2*1.0e-8      # membrane area in cm^2
     C = A*Cs              # capacitance in uF
     N = nchannels(g_pS,membrane_conductance,d)
-    g_uS = g_pS*1.0e-6    # channel conductance in μS
+    g_uS = g_pS*1.0e-9    # channel conductance in μS
                           # (equation dimensions: mv / ms = mS * mv / uF )
 
     # overload default constructor
@@ -293,7 +293,7 @@ function nchannels(s_channel, s_membrane, celldiam)
 
    A = π*celldiam^2*1.0e-8            # membrane area in cm^2
    mS = A*s_membrane                  # capacitance in mS
-   pS = 1.0e6*mS                      # capacitance in pS
+   pS = 1.0e9*mS                      # capacitance in pS
    n = Int64(round(pS/s_channel))     # number of channels
 
 end
